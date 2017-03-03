@@ -3,6 +3,7 @@ import os
 import random
 from random import shuffle
 import logging
+import board
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -11,9 +12,10 @@ def static(path):
     return bottle.static_file(path, root='static/')
 
 
-@bottle.post('/start')
-def start():
+@bottle.post('/<name>/start')
+def start(name = 'random'):
     data = bottle.request.json
+    logging.info("Request %s", data)
     game_id = data['game_id']
     board_width = data['width']
     board_height = data['height']
@@ -29,36 +31,27 @@ def start():
         'color': '#00FF00',
         'taunt': '{} ({}x{})'.format(game_id, board_width, board_height),
         'head_url': head_url,
-        'name': 'battlesnake-python'
+        'name': name.capitalize() + ' Snake'
     }
 
 
-@bottle.post('/move')
-def move():
+@bottle.post('/<name>/move')
+def move(name = 'random'):
     data = bottle.request.json
     logging.info("Request %s", data)
     game_id = data['game_id']
-    board_width = data['width']
-    board_height = data['height']
+    width = data['width']
+    height = data['height']
     food = data['food']
     snakes = data['snakes']
     turn = data['turn']
     my_id = data['you']
 
-    # TODO: Do things with data
-    directions = ['right', 'down', 'left', 'up']
+    game_board = board.Board(width, height, snakes, food, my_id)
 
-    if turn%5:
-        shuffle(directions)
-
-    my_snake = get_snake(my_id, snakes)
-    my_head_pos = my_snake['coords'][0]
-
-    for dir in directions:
-        move = dir
-        move_coord = get_move_coord(move, my_head_pos)
-        if not is_boundary(move_coord, board_width, board_height) and not is_any_tail(move_coord, snakes):
-            break
+    logging.info("Current location %s", game_board.my_head)
+    move = basic_strategy(game_board, turn)
+    logging.info("Current location %s", game_board.my_head)
 
     return {
         'move': move,
@@ -66,17 +59,8 @@ def move():
     }
 
 
-def get_snake(snake_uuid, snakes):
-    for snake in snakes:
-        if snake['id'] == snake_uuid:
-            return snake
 
 
-def is_boundary(coord, board_width, board_height):
-    if (board_width <= coord[0]) or (board_height <= coord[1]) or (coord[0] < 0) or (coord[1] < 0):
-        return True
-    else:
-        return False
 
 def is_tail(coord, snake):
     for pos in snake['coords']:
@@ -91,22 +75,19 @@ def is_any_tail(coord, snakes):
             return True
 
 
+def basic_strategy(game_board, turn):
+    directions = board.DIRECTIONS
+    if turn%5:
+        shuffle(directions)
 
-def get_move_coord(move, current_pos):
-    x = current_pos[0]
-    y = current_pos[1]
+    for dir in directions:
+        move = dir
+        if game_board.is_move_safe(move):
+            return move
 
-    if move == "up":
-        y -= 1
-    elif move == "down":
-        y += 1
-    elif move == "left":
-        x -= 1
-    else: # move == "right":
-        x += 1
-
-    logging.info("Calculated move coordinates for %s as %s, %s", move, x, y)
-    return (x, y)
+    # no safe move found
+    logging.info("No safe move found %s", move)
+    return move
 
 #todo check health -- go for food when health is less than distance to food
 
@@ -114,3 +95,15 @@ def get_move_coord(move, current_pos):
 application = bottle.default_app()
 if __name__ == '__main__':
     bottle.run(application, host=os.getenv('IP', '0.0.0.0'), port=os.getenv('PORT', '8080'))
+
+
+#todo more sneks
+#corner sneck
+#wall sneck
+#box sneck
+#hungry sneck
+#nascar sneck
+#kamikazi snaek
+#shanke'n snake
+#cutoff snake
+#avoidance snake
